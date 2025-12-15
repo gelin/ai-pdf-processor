@@ -1,0 +1,4 @@
+# Runtime dependencies for ai-pdf-processor
+
+# Python client for Ollama (used by src/ai_pdf_processor/ollama_vision.py)
+ollama>=0.3.0

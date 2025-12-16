@@ -1,8 +1,9 @@
 # AI PDF Processor
 
 A tiny Python library and CLI that talk to a local Ollama instance to answer
-questions about an image using a vision model (e.g., `llava`). This is a
-building block for processing PDF scans or images and extracting answers.
+questions about an image or a PDF (PDF pages are auto-converted to PNG) using
+ a vision model (e.g., `llava`). This is a building block for processing PDF
+scans or images and extracting answers.
 
 Input: image (or PDF converted to images) + questions.
 Output: textual answers (you can interpret them as boolean, number, or string in your app).
@@ -13,6 +14,7 @@ Uses a small local LLaVA model via Ollama to analyze images.
 
 - Python 3.9+
 - Install the official client: `pip install ollama`
+- For PDF support, install: `pip install pymupdf`
 - A running Ollama server (default: `http://localhost:11434`)
 - A vision-capable model pulled, e.g.: `ollama pull llava:7b`
 
@@ -23,7 +25,7 @@ You can override the endpoint with `OLLAMA_ENDPOINT` env var.
 ```
 pip install ollama
 
-from ai_pdf_processor import ask_image_question
+from ai_pdf_processor import ask_image_question, ask_pdf_question
 
 answer = ask_image_question(
     image="/path/to/image.png",  # or a URL
@@ -31,6 +33,15 @@ answer = ask_image_question(
     model="llava:7b",            # required
     endpoint="http://localhost:11434",  # optional (can use $OLLAMA_ENDPOINT)
     options={"temperature": 0}, # optional
+)
+print(answer)
+
+# Ask about a PDF (select page 2)
+answer = ask_pdf_question(
+    pdf_path="/path/to/file.pdf",
+    question="What is the invoice total on this page?",
+    page=2,
+    model="llava:7b",
 )
 print(answer)
 ```
@@ -41,6 +52,12 @@ You can run the CLI module directly:
 
 ```
 python -m ai_pdf_processor.cli /path/to/image.png "What is the invoice total?"
+
+# PDF input (uses page 1 by default)
+python -m ai_pdf_processor.cli /path/to/file.pdf "What is the invoice total?"
+
+# Select a specific PDF page (1-based index)
+python -m ai_pdf_processor.cli --page 2 /path/to/file.pdf "What is the invoice total?"
 ```
 
 Options:
@@ -61,7 +78,8 @@ CLI exits with non-zero on error. Use `--json` to get `{ "answer": "..." }`.
 
 ## Notes
 
-- If you work with PDFs, convert pages to images first (e.g., with `pdftoppm` or `pypdfium2`).
+- Local PDF file paths are supported directly and will be auto-converted to PNG via PyMuPDF.
+- Remote PDF URLs are not automatically downloaded; download to a local file first.
 - For structured outputs (bool/number/string), add instructions in the question, e.g.,
   "Answer with only true/false" or "Respond with only a number".
 

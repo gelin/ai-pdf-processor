@@ -2,3 +2,6 @@
 
 # Python client for Ollama (used by src/ai_pdf_processor/ollama_vision.py)
 ollama>=0.3.0
+
+# PDF to PNG conversion (PyMuPDF)
+pymupdf>=1.24.0

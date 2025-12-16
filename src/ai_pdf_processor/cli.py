@@ -18,10 +18,10 @@ except ImportError:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Ask a question about an image using an Ollama vision model (e.g., llava).",
+        description="Ask a question about an image or a PDF (auto-converted) using an Ollama vision model (e.g., llava).",
     )
-    p.add_argument("image", help="Path or URL to the image")
-    p.add_argument("question", help="Question to ask about the image")
+    p.add_argument("document", help="Path or URL to the image, or a local PDF file path")
+    p.add_argument("question", help="Question to ask about the document")
     p.add_argument("--model", required=True,
                    help="Ollama model to use (required), e.g. llava:7b")
     p.add_argument("--endpoint", default=os.environ.get("OLLAMA_ENDPOINT", "http://localhost:11434"),
@@ -30,6 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--option", action="append", default=[], metavar="KEY=VALUE",
                    help="Model generation option (repeatable), e.g. --option temperature=0 --option num_ctx=4096")
     p.add_argument("--json", action="store_true", help="Output JSON with {answer: ...}")
+    p.add_argument(
+        "--page",
+        type=int,
+        default=1,
+        help="When input is a PDF, which page to use (1-based index, default: 1)",
+    )
     return p
 
 
@@ -59,14 +65,36 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        answer = ask_image_question(
-            args.image,
-            args.question,
-            model=args.model,
-            endpoint=args.endpoint,
-            options=parse_options(args.option),
-            timeout=args.timeout,
-        )
+        inp = args.document
+        # If local PDF path, delegate to library helper that handles conversion
+        if isinstance(inp, str) and inp.lower().endswith(".pdf") and not inp.startswith("http"):
+            # Lazy import with fallback to support running as a plain script
+            try:
+                from . import ask_pdf_question
+            except Exception:  # fallback when executed as a plain script
+                from ai_pdf_processor import ask_pdf_question
+
+            if args.page < 1:
+                raise SystemExit("--page must be >= 1")
+
+            answer = ask_pdf_question(
+                pdf_path=inp,
+                question=args.question,
+                page=args.page,
+                model=args.model,
+                endpoint=args.endpoint,
+                options=parse_options(args.option),
+                timeout=args.timeout,
+            )
+        else:
+            answer = ask_image_question(
+                inp,
+                args.question,
+                model=args.model,
+                endpoint=args.endpoint,
+                options=parse_options(args.option),
+                timeout=args.timeout,
+            )
     except KeyboardInterrupt:
         return 130
     except Exception as e:

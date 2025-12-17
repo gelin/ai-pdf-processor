@@ -1,0 +1,89 @@
+{
+  "answers": [
+    {
+      "question": "Netvalue Christmas Newsletter",
+      "answer": "string",
+      "comments": ""
+    },
+    {
+      "question": "Important dances",
+      "answer": "boolean",
+      "comments": "The 'All I want for Christmas is my 2 front teeth' option is checked."
+    },
+    {
+      "question": "Rudolf the red nosed reindeer",
+      "answer": "boolean",
+      "comments": "The 'Rudolf the red nosed reindeer' option is not checked."
+    },
+    {
+      "question": "Silent night",
+      "answer": "boolean",
+      "comments": "The 'Silent night' option is not checked."
+    },
+    {
+      "question": "Snoopys Christmas",
+      "answer": "boolean",
+      "comments": "The 'Snoopys Christmas' option is not checked."
+    },
+    {
+      "question": "Mince pies",
+      "answer": "boolean",
+      "comments": "The 'Mince pies' option is not checked."
+    },
+    {
+      "question": "Gingerbread men",
+      "answer": "boolean",
+      "comments": "The 'Gingerbread men' option is not checked."
+    },
+    {
+      "question": "Pavlova",
+      "answer": "boolean",
+      "comments": "The 'Pavlova' option is not checked."
+    },
+    {
+      "question": "Christmas pudding with brandy butter",
+      "answer": "boolean",
+      "comments": "The 'Christmas pudding with brandy butter' option is not checked."
+    },
+    {
+      "question": "Do you want to sign up for next years Newssheet?",
+      "answer": "boolean",
+      "comments": "The answer to this question is 'Yes'."
+    },
+    {
+      "question": "When will the office be shut down?",
+      "answer": "string",
+      "comments": ""
+    },
+    {
+      "question": "When is the hackathon presentation going to be made?",
+      "answer": "string",
+      "comments": ""
+    },
+    {
+      "question": "What sort of spy hides in a bakery?",
+      "answer": "string",
+      "comments": ""
+    },
+    {
+      "question": "How do you get frostbite?",
+      "answer": "string",
+      "comments": ""
+    },
+    {
+      "question": "What are the persons favourite Christmas songs?",
+      "answer": "string",
+      "comments": ""
+    },
+    {
+      "question": "How many ticks are on the page?",
+      "answer": "number",
+      "comments": "There are 0 ticks on the page."
+    },
+    {
+      "question": "Have they signed up for next years newssheet?",
+      "answer": "boolean",
+      "comments": "The answer to this question is 'Yes'."
+    }
+  ]
+}

@@ -1,7 +1,9 @@
 import base64
+import json
+import logging
 import os
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Literal
 
 from ollama import Client
 
@@ -13,18 +15,51 @@ def _is_url(s: str) -> bool:
     return s.startswith("http://") or s.startswith("https://")
 
 
-def _load_image_as_base64(image: str) -> str:
-    if _is_url(image):
-        # Lightweight URL fetch without adding requests dependency
-        # Use urllib to avoid external deps.
-        from urllib.request import urlopen
-
-        with urlopen(image, timeout=30) as resp:  # nosec - caller controls URL intentionally
-            data = resp.read()
-    else:
-        with open(image, "rb") as f:
-            data = f.read()
+def _load_local_image_as_base64(image_path: str) -> str:
+    if _is_url(image_path):
+        raise ValueError("Only local files are supported; URLs are not allowed.")
+    if not os.path.isfile(image_path):
+        raise FileNotFoundError(f"Image not found: {image_path}")
+    with open(image_path, "rb") as f:
+        data = f.read()
     return base64.b64encode(data).decode("ascii")
+
+
+@dataclass(frozen=True)
+class Question:
+    question: str
+    type: Literal["string", "number", "boolean"] = "string"
+
+
+def _build_batch_prompt(questions: List[Question]) -> str:
+    lines: List[str] = []
+    lines.append(
+        "You're analysing one page or a scanned document image. Carefully read all visible text and layout."
+    )
+    lines.append(
+        'Answer the following questions. Return a STRICT JSON object with the schema:\n'
+        '{\n  "answers": ['
+        '{ "question": "<original question>", "answer": "<your answer with appropriate JSON type>", "comments": "<your optional comments>"}'
+        '<...one answer per question, same order...>'
+        ']\n}'
+    )
+    lines.append("Rules:")
+    lines.append("- Quote the original question in 'question' field of the answer JSON object.")
+    lines.append("- Put your answer in 'answer' field of the answer JSON object.")
+    lines.append("- In answer value use native JSON types only: string, number, boolean, or null when uncertain.")
+    lines.append("- Add optional 'comments' field with your comments to the answer JSON object if needed.")
+    lines.append("- Do not include any extra keys or text before/after the JSON.")
+    lines.append("- The length of 'answers' must equal the number of questions asked.")
+    lines.append("")
+    lines.append("Questions (with expected answer types):")
+    for i, q in enumerate(questions, start=1):
+        qtext = (q.question or "").strip()
+        qtype = (q.type or "string").strip().lower()
+        lines.append(f"{i}. {qtext} (answer with {qtype} JSON type)")
+    lines.append("")
+    lines.append("Output only:")
+    lines.append('{\n  \"answers\": [ { "question": ..., "answer": ..., "comments": ... }, ... ]\n}')
+    return "\n".join(lines)
 
 
 @dataclass
@@ -48,13 +83,14 @@ class OllamaVisionClient:
         if not self.model:
             raise ValueError("Model must be provided (no default). Set OllamaVisionClient.model or pass model to ask_image_question().")
 
-        b64 = _load_image_as_base64(image)
+        b64 = _load_local_image_as_base64(image)
         client = Client(host=self.endpoint)
         resp = client.generate(
             model=self.model,
             prompt=question,
             images=[b64],
             options=options or None,
+            format='json',
             stream=False,
         )
         response = (resp or {}).get("response") or {}
@@ -62,8 +98,78 @@ class OllamaVisionClient:
             raise RuntimeError("Unexpected response from Ollama client: missing 'response'")
         return response
 
+    def ask_many(self, image: str, questions: List[Question], *, options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Ask multiple questions about the provided image in a single call.
+
+        Parameters:
+            image: Local file path to the image.
+            questions: List of {"question": str, "type": "string"|"number"|"boolean"}.
+            options: Optional dict with model generation options.
+
+        Returns:
+            Parsed JSON dict from the model, expected to contain {"answers": [...]}
+        """
+        if not self.model:
+            raise ValueError("Model must be provided (no default). Set OllamaVisionClient.model.")
+
+        if not isinstance(questions, list) or not questions:
+            raise ValueError("'questions' must be a non-empty list")
+        # Basic validation of types for dataclass Question
+        allowed = {"string", "number", "boolean"}
+        for q in questions:
+            if not isinstance(q, Question):
+                raise ValueError("Each item in 'questions' must be a Question dataclass instance")
+            if (q.type or "string").lower() not in allowed:
+                raise ValueError(f"Unsupported question type '{q.type}'. Allowed: string, number, boolean")
+
+        prompt = _build_batch_prompt(questions)
+        logging.info(f"Generated prompt:\n{prompt}")
+
+        b64 = _load_local_image_as_base64(image)
+        client = Client(host=self.endpoint)
+
+        # Ensure JSON mode is enabled
+        merged_options = dict(options or {})
+        merged_options.setdefault("format", "json")
+
+        resp = client.generate(
+            model=self.model,
+            prompt=prompt,
+            images=[b64],
+            options=merged_options,
+            format='json',
+            stream=False,
+        )
+        response = (resp or {}).get("response")
+        if not isinstance(response, str):
+            raise RuntimeError("Unexpected response from Ollama client: missing 'response'")
+        try:
+            data = json.loads(response)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Model did not return valid JSON: {e}\nRaw: {response[:500]}")
+        if not isinstance(data, dict) or "answers" not in data:
+            raise RuntimeError("Model JSON missing 'answers' array")
+        # if not isinstance(data["answers"], list) or len(data["answers"]) != len(questions):
+        #     raise RuntimeError("'answers' must be a list with the same length as questions")
+        return data
+
 
 def ask_image_question(image: str, question: str, *, model: str, endpoint: Optional[str] = None,
                        options: Optional[Dict[str, Any]] = None, timeout: int = 120) -> str:
     client = OllamaVisionClient(endpoint=endpoint or DEFAULT_ENDPOINT, model=model, timeout=timeout)
     return client.ask(image, question, options=options)
+
+
+def ask_image_questions(
+    image: str,
+    questions: List[Question],
+    *,
+    model: str,
+    endpoint: Optional[str] = None,
+    options: Optional[Dict[str, Any]] = None,
+    timeout: int = 120,
+) -> Dict[str, Any]:
+    """Unified image entrypoint for multiple questions (JSON answers)."""
+    client = OllamaVisionClient(endpoint=endpoint or DEFAULT_ENDPOINT, model=model, timeout=timeout)
+    return client.ask_many(image, questions, options=options)

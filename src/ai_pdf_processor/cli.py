@@ -18,10 +18,10 @@ except ImportError:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Ask a question about an image or a PDF (auto-converted) using an Ollama vision model (e.g., llava).",
+        description="Ask one or multiple typed questions about a local image or a PDF page using an Ollama vision model.",
     )
-    p.add_argument("document", help="Path or URL to the image, or a local PDF file path")
-    p.add_argument("question", help="Question to ask about the document")
+    p.add_argument("document", help="Local path to the image or PDF (URLs are not allowed)")
+    p.add_argument("question", nargs="?", help="Single question to ask (fallback if --questions/--questions-file not used)")
     p.add_argument("--model", required=True,
                    help="Ollama model to use (required), e.g. llava:7b")
     p.add_argument("--endpoint", default=os.environ.get("OLLAMA_ENDPOINT", "http://localhost:11434"),
@@ -29,12 +29,30 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=int, default=120, help="Request timeout in seconds (default: 120)")
     p.add_argument("--option", action="append", default=[], metavar="KEY=VALUE",
                    help="Model generation option (repeatable), e.g. --option temperature=0 --option num_ctx=4096")
-    p.add_argument("--json", action="store_true", help="Output JSON with {answer: ...}")
+    p.add_argument("--json", action="store_true", help="Output JSON (for single question, wraps as {answer: ...})")
     p.add_argument(
         "--page",
         type=int,
         default=1,
         help="When input is a PDF, which page to use (1-based index, default: 1)",
+    )
+    qgrp = p.add_argument_group("Multiple questions")
+    qgrp.add_argument(
+        "--questions",
+        help=(
+            "JSON array of questions, e.g. "
+            "'[{""question"": ""Total sum?"", ""type"": ""number""}, {""question"": ""Has signature?"", ""type"": ""boolean""}]'"
+        ),
+    )
+    qgrp.add_argument(
+        "--questions-file",
+        help="Path to a JSON file containing the questions array",
+    )
+    qgrp.add_argument(
+        "--type",
+        default="string",
+        choices=["string", "number", "boolean"],
+        help="Expected type for the single positional -- question (default: string)",
     )
     return p
 
@@ -66,45 +84,51 @@ def main(argv=None) -> int:
 
     try:
         inp = args.document
-        # If local PDF path, delegate to library helper that handles conversion
-        if isinstance(inp, str) and inp.lower().endswith(".pdf") and not inp.startswith("http"):
-            # Lazy import with fallback to support running as a plain script
-            try:
-                from . import ask_pdf_question
-            except Exception:  # fallback when executed as a plain script
-                from ai_pdf_processor import ask_pdf_question
-
-            if args.page < 1:
-                raise SystemExit("--page must be >= 1")
-
-            answer = ask_pdf_question(
-                pdf_path=inp,
-                question=args.question,
-                page=args.page,
-                model=args.model,
-                endpoint=args.endpoint,
-                options=parse_options(args.option),
-                timeout=args.timeout,
-            )
+        # Determine questions list
+        q_list = None
+        if args.questions_file:
+            with open(args.questions_file, "r", encoding="utf-8") as f:
+                q_list = json.load(f)
+        elif args.questions:
+            q_list = json.loads(args.questions)
+        elif args.question:
+            q_list = [{"question": args.question, "type": args.type}]
         else:
-            answer = ask_image_question(
-                inp,
-                args.question,
-                model=args.model,
-                endpoint=args.endpoint,
-                options=parse_options(args.option),
-                timeout=args.timeout,
-            )
+            raise SystemExit("Provide either positional QUESTION or --questions/--questions-file")
+
+        # Call unified API
+        try:
+            from . import ask_document_questions
+        except Exception:
+            from ai_pdf_processor import ask_document_questions
+
+        if args.page < 1:
+            raise SystemExit("--page must be >= 1")
+
+        result = ask_document_questions(
+            path=inp,
+            questions=q_list,
+            page=args.page,
+            model=args.model,
+            endpoint=args.endpoint,
+            options=parse_options(args.option),
+            timeout=args.timeout,
+        )
     except KeyboardInterrupt:
         return 130
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-    if args.json:
-        print(json.dumps({"answer": answer}, ensure_ascii=False))
+    # Output
+    if isinstance(result, dict) and "answers" in result:
+        print(json.dumps(result, ensure_ascii=False))
     else:
-        print(answer)
+        # Fallback for backward compatibility when using single-question path
+        if args.json:
+            print(json.dumps({"answer": result}, ensure_ascii=False))
+        else:
+            print(result)
     return 0
 
 

@@ -31,6 +31,34 @@ class Question:
     type: Literal["string", "number", "boolean"] = "string"
 
 
+RESPONSE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["answers"],
+    "properties": {
+        "answers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["question", "answer"],
+                "properties": {
+                    "question": {
+                        "type": "string",
+                    },
+                    "answer": {
+                        "type": ["string", "number", "boolean", "null"]
+                    },
+                    "comment": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 def _build_batch_prompt(questions: List[Question]) -> str:
     lines: List[str] = []
     lines.append(
@@ -39,7 +67,7 @@ def _build_batch_prompt(questions: List[Question]) -> str:
     lines.append(
         'Answer the following questions. Return a STRICT JSON object with the schema:\n'
         '{\n  "answers": ['
-        '{ "question": "<original question>", "answer": "<your answer with appropriate JSON type>", "comments": "<your optional comments>"}'
+        '{ "question": "<original question>", "answer": "<your answer with appropriate JSON type>", "comment": "<your optional comment>"}'
         '<...one answer per question, same order...>'
         ']\n}'
     )
@@ -47,7 +75,7 @@ def _build_batch_prompt(questions: List[Question]) -> str:
     lines.append("- Quote the original question in 'question' field of the answer JSON object.")
     lines.append("- Put your answer in 'answer' field of the answer JSON object.")
     lines.append("- In answer value use native JSON types only: string, number, boolean, or null when uncertain.")
-    lines.append("- Add optional 'comments' field with your comments to the answer JSON object if needed.")
+    lines.append("- Add optional 'comment' field with your comments to the answer JSON object if needed.")
     lines.append("- Do not include any extra keys or text before/after the JSON.")
     lines.append("- The length of 'answers' must equal the number of questions asked.")
     lines.append("")
@@ -58,7 +86,7 @@ def _build_batch_prompt(questions: List[Question]) -> str:
         lines.append(f"{i}. {qtext} (answer with {qtype} JSON type)")
     lines.append("")
     lines.append("Output only:")
-    lines.append('{\n  \"answers\": [ { "question": ..., "answer": ..., "comments": ... }, ... ]\n}')
+    lines.append('{\n  \"answers\": [ { "question": ..., "answer": ..., "comment": ... }, ... ]\n}')
     return "\n".join(lines)
 
 
@@ -90,7 +118,7 @@ class OllamaVisionClient:
             prompt=question,
             images=[b64],
             options=options or None,
-            format='json',
+            format=RESPONSE_SCHEMA,
             stream=False,
         )
         response = (resp or {}).get("response") or {}
@@ -138,7 +166,7 @@ class OllamaVisionClient:
             prompt=prompt,
             images=[b64],
             options=merged_options,
-            format='json',
+            format=RESPONSE_SCHEMA,
             stream=False,
         )
         response = (resp or {}).get("response")

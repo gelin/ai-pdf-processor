@@ -73,7 +73,7 @@ def test_questions_christmas_doc_good_questions():
         page=1,
         model=_get_model(),
         endpoint=endpoint,
-        options={"temperature": 0},
+        # options={"temperature": 0},
         timeout=180,
     )
 
@@ -116,7 +116,7 @@ def test_questions_christmas_doc_hard_questions():
         page=1,
         model=_get_model(),
         endpoint=endpoint,
-        options={"temperature": 0},
+        # options={"temperature": 0},
         timeout=180,
     )
 

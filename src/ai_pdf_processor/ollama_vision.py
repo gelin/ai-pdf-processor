@@ -22,7 +22,10 @@ def _load_local_image_as_base64(image_path: str) -> str:
         raise FileNotFoundError(f"Image not found: {image_path}")
     with open(image_path, "rb") as f:
         data = f.read()
-    return base64.b64encode(data).decode("ascii")
+    logging.debug(f"Loaded image from {image_path} ({len(data)} bytes)")
+    b64 = base64.b64encode(data).decode("ascii")
+    logging.debug(f"Converted to base64: {b64[:10]}...")
+    return b64
 
 
 @dataclass(frozen=True)
@@ -113,12 +116,14 @@ class OllamaVisionClient:
 
         b64 = _load_local_image_as_base64(image)
         client = Client(host=self.endpoint)
+        logging.debug(f"Prompt:\n{question}")
+        logging.debug(f"Image:\n{b64[:10]}...")
         resp = client.generate(
             model=self.model,
             prompt=question,
             images=[b64],
             options=options or None,
-            format=RESPONSE_SCHEMA,
+            # format=RESPONSE_SCHEMA,
             stream=False,
         )
         response = (resp or {}).get("response") or {}
@@ -155,6 +160,8 @@ class OllamaVisionClient:
         logging.info(f"Generated prompt:\n{prompt}")
 
         b64 = _load_local_image_as_base64(image)
+        logging.debug(f"Image:\n{b64[:10]}...")
+
         client = Client(host=self.endpoint)
 
         # Ensure JSON mode is enabled

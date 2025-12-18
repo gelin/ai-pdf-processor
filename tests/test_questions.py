@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import socket
 import sys
@@ -38,7 +39,7 @@ def _endpoint_reachable(endpoint: str) -> bool:
 
 
 def _get_model() -> str:
-    return os.environ.get("OLLAMA_MODEL", "llava:7b")
+    return os.environ.get("OLLAMA_MODEL", "gemma3n:e2b")
 
 
 @pytest.mark.integration
@@ -65,7 +66,7 @@ def test_questions_christmas_doc_good_questions():
         Question(question="In the 'What is your favourite Christmas treat' group, is the 'Christmas pudding with brandy butter' option checked?", type="boolean"),
         Question(question="Is the answer to 'Do you want to sign up for next years Newssheet?' question 'Yes'?", type="boolean"),
     ]
-    print(questions)
+    logging.info(questions)
 
     result = ask_document_questions(
         path=doc_path,
@@ -77,7 +78,7 @@ def test_questions_christmas_doc_good_questions():
         timeout=180,
     )
 
-    print(json.dumps(result, indent=2))
+    logging.info(json.dumps(result, indent=2))
     assert isinstance(result, dict)
     assert "answers" in result and isinstance(result["answers"], list)
     assert len(result["answers"]) == len(questions)
@@ -108,7 +109,7 @@ def test_questions_christmas_doc_hard_questions():
         Question(question="How many ticks are on the page?", type="number"),
         Question(question="Have they signed up for next years newssheet?", type="boolean"),
     ]
-    print(questions)
+    logging.info(questions)
 
     result = ask_document_questions(
         path=doc_path,
@@ -120,7 +121,7 @@ def test_questions_christmas_doc_hard_questions():
         timeout=180,
     )
 
-    print(json.dumps(result, indent=2))
+    logging.info(json.dumps(result, indent=2))
     assert isinstance(result, dict)
     assert "answers" in result and isinstance(result["answers"], list)
     assert len(result["answers"]) == len(questions)

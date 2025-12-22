@@ -40,7 +40,7 @@ def _endpoint_reachable(endpoint: str) -> bool:
 
 
 def _get_model() -> str:
-    return os.environ.get("OLLAMA_MODEL", "gemma3n:e2b")
+    return os.environ.get("OLLAMA_MODEL", "llava:7b")
 
 
 @pytest.mark.integration
@@ -63,7 +63,7 @@ def test_basic_understanding():
         #          'List all answer options for each question. '
         #          'Discover what are the answers to the questions, which checkboxes are checked, etc... '
         #          'Provide as many details as possible.',
-        question="What image do you see?",
+        question="What do you see on this image?",
         model=_get_model(),
         endpoint=endpoint,
         # options={"temperature": 0},

@@ -39,13 +39,19 @@ def pdf_to_png_pages(pdf_path: str, out_dir: Optional[str] = None, dpi: int = 14
     out_dir = out_dir or os.path.dirname(os.path.abspath(pdf_path)) or "."
     os.makedirs(out_dir, exist_ok=True)
 
-    zoom = dpi / 72.0
-    mat = fitz.Matrix(zoom, zoom)  # scale matrix based on DPI
-
     png_paths: List[str] = []
     with fitz.open(pdf_path) as doc:
         for page_index in range(doc.page_count):
             page = doc.load_page(page_index)
+
+            # Limit width to 768 pixels
+            zoom = dpi / 72.0
+            if page.rect.width * zoom > 336:
+                zoom = 336 / page.rect.width
+            # if page.rect.height * zoom > 768:
+            #     zoom = 768 / page.rect.height
+            mat = fitz.Matrix(zoom, zoom)
+
             pix = page.get_pixmap(matrix=mat, alpha=False)
             base = os.path.splitext(os.path.basename(pdf_path))[0]
             out_path = os.path.join(out_dir, f"{base}_page{page_index + 1}.png")

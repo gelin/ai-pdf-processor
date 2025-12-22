@@ -91,4 +91,4 @@ REST API. Python lib to Ollama. Conversion of PDF to PNG.
 
 These models can be good for this task:
 * [llava:7b](https://ollama.com/library/llava)
-* [gemma3n:e2b](https://ollama.com/library/gemma3n)
+* ~~[gemma3n:e2b](https://ollama.com/library/gemma3n)~~ (supports only text input, not images)
